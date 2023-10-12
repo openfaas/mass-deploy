@@ -1,3 +1,6 @@
+// Copyright (c) 2023 Alex Ellis, OpenFaaS Ltd
+// License: MIT
+
 package main
 
 import (
@@ -10,6 +13,8 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/alexellis/go-execute/v2"
 	"github.com/openfaas/faas-provider/types"
@@ -19,29 +24,32 @@ import (
 func main() {
 
 	var (
-		gateway, username     string
-		action                string
-		name, image, fprocess string
-		functions, startAt    int
+		gateway, username, namespace string
+		action                       string
+		name, image, fprocess        string
+		functions, startAt, workers  int
 	)
 
 	flag.StringVar(&gateway, "gateway", "http://127.0.0.1:8080", "gateway url")
-
+	flag.StringVar(&namespace, "namespace", "openfaas-fn", "namespace for functions")
 	flag.IntVar(&functions, "functions", 100, "number of functions to create")
 	flag.IntVar(&startAt, "start-at", 0, "start at function number")
 	flag.StringVar(&name, "name", "env", "name of function")
 	flag.StringVar(&image, "image", "", "image to use for function")
 	flag.StringVar(&fprocess, "fprocess", "env", "fprocess to use for function")
 	flag.StringVar(&action, "action", "create", "action to perform")
+	flag.IntVar(&workers, "workers", 1, "number of workers to use")
 
 	flag.Parse()
 
-	gatewayURL, _ := url.Parse(gateway)
+	gatewayURL, err := url.Parse(gateway)
+	if err != nil {
+		panic(err)
+	}
 
 	password := lookupPasswordViaKubectl()
 
 	username = "admin"
-
 	auth := &sdk.BasicAuth{
 		Username: username,
 		Password: password,
@@ -53,41 +61,79 @@ func main() {
 
 	client := sdk.NewClient(gatewayURL, auth, http.DefaultClient)
 
+	wg := sync.WaitGroup{}
+	wg.Add(workers)
+
+	started := time.Now()
+
+	workChan := make(chan string)
+
+	for i := 0; i < workers; i++ {
+		go func(worker int) {
+			for name := range workChan {
+				if len(name) > 0 {
+					if err := reconcile(worker, name, image, fprocess, client, namespace, action); err != nil {
+						panic(err)
+					}
+				}
+			}
+			wg.Done()
+		}(i)
+	}
+
 	for i := startAt; i < functions; i++ {
-		name := fmt.Sprintf("%s-%d", name, i+1)
+		functionName := fmt.Sprintf("%s-%d", name, i+1)
+		workChan <- functionName
+	}
 
-		if action == "create" {
-			log.Printf("Creating function %d: %s", i+1, name)
-			spec := types.FunctionDeployment{
-				Service: name,
-				Image:   image,
-			}
+	close(workChan)
 
-			if len(fprocess) > 0 {
-				spec.EnvProcess = fprocess
-			}
+	wg.Wait()
 
-			code, err := client.Deploy(context.Background(), spec)
-			if err != nil {
-				panic(err)
-			}
+	log.Printf("Took: %.2f", time.Since(started).Seconds())
 
-			if code != http.StatusOK && code != http.StatusAccepted {
-				panic(err)
-			}
-			log.Printf("Status: %d", code)
+}
 
-		} else if action == "delete" {
-			log.Printf("Deleting function %d: %s", i+1, name)
-
-			namespace := "openfaas-fn"
-			if err := client.DeleteFunction(context.Background(), name, namespace); err != nil {
-				panic(err)
-			}
-
+func reconcile(worker int, name, image, fprocess string, client *sdk.Client, namespace, action string) error {
+	if action == "create" {
+		log.Printf("[%d] Creating: %s", worker, name)
+		spec := types.FunctionDeployment{
+			Service:   name,
+			Image:     image,
+			Namespace: namespace,
 		}
 
+		if len(fprocess) > 0 {
+			spec.EnvProcess = fprocess
+		}
+
+		start := time.Now()
+
+		code, err := client.Deploy(context.Background(), spec)
+		if err != nil {
+			return err
+		}
+
+		if code != http.StatusOK && code != http.StatusAccepted {
+			return err
+		}
+		log.Printf("[%d] Created: %s, status: %d (%dms)", worker, name, code, time.Since(start).Milliseconds())
+
+	} else if action == "delete" {
+		start := time.Now()
+		log.Printf("[%d] Deleting function: %s", worker, name)
+
+		if err := client.DeleteFunction(context.Background(), name, namespace); err != nil {
+			log.Printf("[%d] Delete %s, error: %s", worker, name, err)
+
+			if !strings.Contains(err.Error(), "not found") {
+				return err
+			}
+		}
+		log.Printf("[%d] Deleted function: %s (%dms)", worker, name, time.Since(start).Milliseconds())
 	}
+
+	return nil
 }
 
 func lookupPasswordViaKubectl() string {
