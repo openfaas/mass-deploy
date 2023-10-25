@@ -1,4 +1,4 @@
-module github.com/alexellis/mass-deploy
+module github.com/openfaas/mass-deploy
 
 go 1.20
 

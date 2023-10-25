@@ -1,5 +1,6 @@
 github.com/alexellis/go-execute/v2 v2.2.1 h1:4Ye3jiCKQarstODOEmqDSRCqxMHLkC92Bhse743RdOI=
 github.com/alexellis/go-execute/v2 v2.2.1/go.mod h1:FMdRnUTiFAmYXcv23txrp3VYZfLo24nMpiIneWgKHTQ=
+github.com/google/go-cmp v0.5.9 h1:O2Tfq5qg4qc4AmwVlvv0oLiVAGB7enBSJ2x2DqQFi38=
 github.com/openfaas/faas-provider v0.24.0 h1:5ToqdkqZ3pM9SdFKBMUmhU8IjXMh6+qd7gEDBeFhp1M=
 github.com/openfaas/faas-provider v0.24.0/go.mod h1:NsETIfEndZn4mn/w/XnBTcDTwKqULCziphLp7KgeRcA=
 github.com/openfaas/go-sdk v0.2.7 h1:FAfSU6YCHA8/41Gpy5PTYu9m5uzkuz8KkSPHtklomHo=
