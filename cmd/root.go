@@ -9,13 +9,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	gateway        string
-	namespace      string
-	workers        int
-	updateExisting bool
-)
-
 var rootCmd = &cobra.Command{
 	Use:   "mass-deploy",
 	Short: "Mass deploy functions to OpenFaaS",
@@ -28,13 +21,18 @@ func Execute() error {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&gateway, "gateway", "http://127.0.0.1:8080", "gateway url")
-	rootCmd.PersistentFlags().StringVar(&namespace, "namespace", "openfaas-fn", "namespace for functions")
-	rootCmd.PersistentFlags().IntVar(&workers, "workers", 1, "number of workers to use")
-	rootCmd.PersistentFlags().BoolVar(&updateExisting, "update-existing", false, "update existing functions")
+	flags := rootCmd.PersistentFlags()
+	flags.String("gateway", "http://127.0.0.1:8080", "gateway url")
+	flags.String("namespace", "openfaas-fn", "namespace for functions")
+	flags.Int("workers", 1, "number of workers to use")
+	flags.Bool("update-existing", false, "update existing functions")
+
+	rootCmd.AddCommand(makeCreateCmd())
+	rootCmd.AddCommand(makeDeleteCmd())
 }
 
-func getClient() (*sdk.Client, error) {
+func getClient(cmd *cobra.Command) (*sdk.Client, error) {
+	gateway, _ := cmd.Flags().GetString("gateway")
 	gatewayURL, err := url.Parse(gateway)
 	if err != nil {
 		return nil, fmt.Errorf("invalid gateway URL: %w", err)

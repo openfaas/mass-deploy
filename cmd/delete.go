@@ -12,33 +12,34 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	deleteName      string
-	deleteFunctions int
-	deleteStartAt   int
-)
-
-var deleteCmd = &cobra.Command{
-	Use:   "delete",
-	Short: "Delete multiple functions",
-	Long: `Delete multiple functions in parallel.
+func makeDeleteCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "delete",
+		Short: "Delete multiple functions",
+		Long: `Delete multiple functions in parallel.
 Each function will be deleted based on the name pattern with numeric suffix.`,
-	RunE: runDelete,
-}
+		RunE: runDelete,
+	}
 
-func init() {
-	rootCmd.AddCommand(deleteCmd)
+	flags := cmd.Flags()
+	flags.String("name", "env", "name of the function")
+	flags.Int("functions", 100, "number of functions to delete")
+	flags.Int("start-at", 0, "start at function number")
 
-	deleteCmd.Flags().StringVar(&deleteName, "name", "env", "name of the function")
-	deleteCmd.Flags().IntVar(&deleteFunctions, "functions", 100, "number of functions to delete")
-	deleteCmd.Flags().IntVar(&deleteStartAt, "start-at", 0, "start at function number")
+	return cmd
 }
 
 func runDelete(cmd *cobra.Command, args []string) error {
-	client, err := getClient()
+	client, err := getClient(cmd)
 	if err != nil {
 		return err
 	}
+
+	name, _ := cmd.Flags().GetString("name")
+	functions, _ := cmd.Flags().GetInt("functions")
+	startAt, _ := cmd.Flags().GetInt("start-at")
+	namespace, _ := cmd.Flags().GetString("namespace")
+	workers, _ := cmd.Flags().GetInt("workers")
 
 	wg := sync.WaitGroup{}
 	wg.Add(workers)
@@ -59,8 +60,8 @@ func runDelete(cmd *cobra.Command, args []string) error {
 		}(i)
 	}
 
-	for i := deleteStartAt; i < deleteFunctions; i++ {
-		functionName := fmt.Sprintf("%s-%d", deleteName, i+1)
+	for i := startAt; i < functions; i++ {
+		functionName := fmt.Sprintf("%s-%d", name, i+1)
 		workChan <- functionName
 	}
 

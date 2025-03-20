@@ -14,44 +14,45 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	name      string
-	image     string
-	fprocess  string
-	functions int
-	startAt   int
-	envVars   []string
-	labels    []string
-)
-
-var createCmd = &cobra.Command{
-	Use:   "create",
-	Short: "Create multiple functions",
-	Long: `Create multiple functions in parallel with the specified configuration.
+func makeCreateCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "create",
+		Short: "Create multiple functions",
+		Long: `Create multiple functions in parallel with the specified configuration.
 Each function will be named with a numeric suffix.`,
-	RunE: runCreate,
-}
+		RunE: runCreate,
+	}
 
-func init() {
-	rootCmd.AddCommand(createCmd)
+	flags := cmd.Flags()
+	flags.String("name", "env", "name of the function")
+	flags.String("image", "", "image to use for the function")
+	flags.String("fprocess", "env", "fprocess to use for the function")
+	flags.Int("functions", 100, "number of functions to create")
+	flags.Int("start-at", 0, "start at function number")
+	flags.StringArray("env", []string{}, "environment variables to set (format: KEY=VALUE)")
+	flags.StringArray("label", []string{}, "labels to set on the function (format: KEY=VALUE)")
 
-	createCmd.Flags().StringVar(&name, "name", "env", "name of the function")
-	createCmd.Flags().StringVar(&image, "image", "", "image to use for the function")
-	createCmd.Flags().StringVar(&fprocess, "fprocess", "env", "fprocess to use for the function")
-	createCmd.Flags().IntVar(&functions, "functions", 100, "number of functions to create")
-	createCmd.Flags().IntVar(&startAt, "start-at", 0, "start at function number")
-	createCmd.Flags().StringArrayVar(&envVars, "env", []string{}, "environment variables to set (format: KEY=VALUE)")
-	createCmd.Flags().StringArrayVar(&labels, "label", []string{}, "labels to set on the function (format: KEY=VALUE)")
-	createCmd.Flags().BoolVar(&updateExisting, "update-existing", false, "update existing functions")
+	cmd.MarkFlagRequired("image")
 
-	createCmd.MarkFlagRequired("image")
+	return cmd
 }
 
 func runCreate(cmd *cobra.Command, args []string) error {
-	client, err := getClient()
+	client, err := getClient(cmd)
 	if err != nil {
 		return err
 	}
+
+	name, _ := cmd.Flags().GetString("name")
+	image, _ := cmd.Flags().GetString("image")
+	fprocess, _ := cmd.Flags().GetString("fprocess")
+	functions, _ := cmd.Flags().GetInt("functions")
+	startAt, _ := cmd.Flags().GetInt("start-at")
+	envVars, _ := cmd.Flags().GetStringArray("env")
+	labels, _ := cmd.Flags().GetStringArray("label")
+	namespace, _ := cmd.Flags().GetString("namespace")
+	workers, _ := cmd.Flags().GetInt("workers")
+	updateExisting, _ := cmd.Flags().GetBool("update-existing")
 
 	wg := sync.WaitGroup{}
 	wg.Add(workers)
