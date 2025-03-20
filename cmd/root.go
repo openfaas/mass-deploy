@@ -25,7 +25,6 @@ func init() {
 	flags.String("gateway", "http://127.0.0.1:8080", "gateway url")
 	flags.String("namespace", "openfaas-fn", "namespace for functions")
 	flags.Int("workers", 1, "number of workers to use")
-	flags.Bool("update-existing", false, "update existing functions")
 
 	rootCmd.AddCommand(makeCreateCmd())
 	rootCmd.AddCommand(makeDeleteCmd())

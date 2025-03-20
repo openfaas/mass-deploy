@@ -31,6 +31,7 @@ Each function will be named with a numeric suffix.`,
 	flags.Int("start-at", 0, "start at function number")
 	flags.StringArray("env", []string{}, "environment variables to set (format: KEY=VALUE)")
 	flags.StringArray("label", []string{}, "labels to set on the function (format: KEY=VALUE)")
+	flags.Bool("update-existing", false, "update existing functions, when set to false, any existing functions are skipped")
 
 	cmd.MarkFlagRequired("image")
 
