@@ -24,10 +24,10 @@ import (
 func main() {
 
 	var (
-		gateway, username, namespace string
-		action                       string
-		name, image, fprocess        string
-		functions, startAt, workers  int
+		gateway, namespace          string
+		action                      string
+		name, image, fprocess       string
+		functions, startAt, workers int
 	)
 
 	flag.StringVar(&gateway, "gateway", "http://127.0.0.1:8080", "gateway url")
@@ -47,12 +47,14 @@ func main() {
 		panic(err)
 	}
 
-	password := lookupPasswordViaKubectl()
+	auth := &sdk.BasicAuth{}
 
-	username = "admin"
-	auth := &sdk.BasicAuth{
-		Username: username,
-		Password: password,
+	if gatewayURL.User != nil {
+		auth.Username = gatewayURL.User.Username()
+		auth.Password, _ = gatewayURL.User.Password()
+	} else {
+		auth.Username = "admin"
+		auth.Password = lookupPasswordViaKubectl()
 	}
 
 	if len(image) == 0 {
