@@ -28,17 +28,23 @@ func main() {
 		action                      string
 		name, image, fprocess       string
 		functions, startAt, workers int
+		env                         string
+		label                       string
+		updateExisting              bool
 	)
 
 	flag.StringVar(&gateway, "gateway", "http://127.0.0.1:8080", "gateway url")
 	flag.StringVar(&namespace, "namespace", "openfaas-fn", "namespace for functions")
 	flag.IntVar(&functions, "functions", 100, "number of functions to create")
 	flag.IntVar(&startAt, "start-at", 0, "start at function number")
-	flag.StringVar(&name, "name", "env", "name of function")
-	flag.StringVar(&image, "image", "", "image to use for function")
-	flag.StringVar(&fprocess, "fprocess", "env", "fprocess to use for function")
+	flag.StringVar(&name, "name", "env", "name of the function")
+	flag.StringVar(&env, "env", "", "environment variable to set (only one)")
+	flag.StringVar(&image, "image", "", "image to use for the function")
+	flag.StringVar(&label, "label", "", "label to set on the function")
+	flag.StringVar(&fprocess, "fprocess", "env", "fprocess to use for the function")
 	flag.StringVar(&action, "action", "create", "action to perform")
 	flag.IntVar(&workers, "workers", 1, "number of workers to use")
+	flag.BoolVar(&updateExisting, "update-existing", false, "update existing functions")
 
 	flag.Parse()
 
@@ -74,7 +80,7 @@ func main() {
 		go func(worker int) {
 			for name := range workChan {
 				if len(name) > 0 {
-					if err := reconcile(worker, name, image, fprocess, client, namespace, action); err != nil {
+					if err := reconcile(worker, name, image, fprocess, client, namespace, action, env, label, updateExisting); err != nil {
 						panic(err)
 					}
 				}
@@ -96,13 +102,28 @@ func main() {
 
 }
 
-func reconcile(worker int, name, image, fprocess string, client *sdk.Client, namespace, action string) error {
+func reconcile(worker int, name, image, fprocess string, client *sdk.Client, namespace, action, env, label string, updateExisting bool) error {
+
 	if action == "create" {
-		log.Printf("[%d] Creating: %s", worker, name)
+
 		spec := types.FunctionDeployment{
 			Service:   name,
 			Image:     image,
 			Namespace: namespace,
+		}
+
+		if len(env) > 0 {
+			envKey, envVal, _ := strings.Cut(env, "=")
+			spec.EnvVars = map[string]string{
+				envKey: envVal,
+			}
+		}
+
+		if len(label) > 0 {
+			labelKey, labelVal, _ := strings.Cut(label, "=")
+			spec.Labels = &map[string]string{
+				labelKey: labelVal,
+			}
 		}
 
 		if len(fprocess) > 0 {
@@ -111,15 +132,42 @@ func reconcile(worker int, name, image, fprocess string, client *sdk.Client, nam
 
 		start := time.Now()
 
-		code, err := client.Deploy(context.Background(), spec)
-		if err != nil {
-			return err
+		update := false
+		if _, err := client.GetFunction(context.Background(), name, namespace); err == nil {
+			update = true
+		}
+		if update && !updateExisting {
+			log.Printf("[%d] Function %s skipped", worker, name)
+			return nil
 		}
 
-		if code != http.StatusOK && code != http.StatusAccepted {
-			return err
+		if update {
+			log.Printf("[%d] Updating: %s", worker, name)
+
+			code, err := client.Update(context.Background(), spec)
+			if err != nil {
+				return err
+			}
+
+			if code != http.StatusOK && code != http.StatusAccepted {
+				return err
+			}
+			log.Printf("[%d] Updated: %s, status: %d (%dms)", worker, name, code, time.Since(start).Milliseconds())
+
+		} else {
+			log.Printf("[%d] Creating: %s", worker, name)
+
+			code, err := client.Deploy(context.Background(), spec)
+			if err != nil {
+				return err
+			}
+
+			if code != http.StatusOK && code != http.StatusAccepted {
+				return err
+			}
+			log.Printf("[%d] Created: %s, status: %d (%dms)", worker, name, code, time.Since(start).Milliseconds())
+
 		}
-		log.Printf("[%d] Created: %s, status: %d (%dms)", worker, name, code, time.Since(start).Milliseconds())
 
 	} else if action == "delete" {
 		start := time.Now()
