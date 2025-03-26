@@ -22,7 +22,6 @@ Each function will be deleted based on the name pattern with numeric suffix.`,
 	}
 
 	flags := cmd.Flags()
-	flags.String("name", "env", "name of the function")
 	flags.Int("functions", 100, "number of functions to delete")
 	flags.Int("start-at", 0, "start at function number")
 
@@ -35,7 +34,12 @@ func runDelete(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	name, _ := cmd.Flags().GetString("name")
+	if len(args) == 0 {
+		return fmt.Errorf("name is required as an argument")
+	}
+
+	name := args[0]
+
 	functions, _ := cmd.Flags().GetInt("functions")
 	startAt, _ := cmd.Flags().GetInt("start-at")
 	namespace, _ := cmd.Flags().GetString("namespace")

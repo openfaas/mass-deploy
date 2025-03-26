@@ -24,7 +24,6 @@ Each function will be named with a numeric suffix.`,
 	}
 
 	flags := cmd.Flags()
-	flags.String("name", "env", "name of the function")
 	flags.String("image", "", "image to use for the function")
 	flags.String("fprocess", "env", "fprocess to use for the function")
 	flags.Int("functions", 100, "number of functions to create")
@@ -44,7 +43,12 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	name, _ := cmd.Flags().GetString("name")
+	if len(args) == 0 {
+		return fmt.Errorf("name is required as an argument")
+	}
+
+	name := args[0]
+
 	image, _ := cmd.Flags().GetString("image")
 	fprocess, _ := cmd.Flags().GetString("fprocess")
 	functions, _ := cmd.Flags().GetInt("functions")
