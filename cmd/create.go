@@ -30,6 +30,7 @@ Each function will be named with a numeric suffix.`,
 	flags.Int("start-at", 0, "start at function number")
 	flags.StringArray("env", []string{}, "environment variables to set (format: KEY=VALUE)")
 	flags.StringArray("label", []string{}, "labels to set on the function (format: KEY=VALUE)")
+	flags.StringArray("annotation", []string{}, "annotations to set on the function (format: KEY=VALUE)")
 	flags.Bool("update-existing", false, "update existing functions, when set to false, any existing functions are skipped")
 
 	cmd.MarkFlagRequired("image")
@@ -55,6 +56,7 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	startAt, _ := cmd.Flags().GetInt("start-at")
 	envVars, _ := cmd.Flags().GetStringArray("env")
 	labels, _ := cmd.Flags().GetStringArray("label")
+	annotations, _ := cmd.Flags().GetStringArray("annotation")
 	namespace, _ := cmd.Flags().GetString("namespace")
 	workers, _ := cmd.Flags().GetInt("workers")
 	updateExisting, _ := cmd.Flags().GetBool("update-existing")
@@ -69,7 +71,7 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		go func(worker int) {
 			for name := range workChan {
 				if len(name) > 0 {
-					if err := reconcile(worker, name, image, fprocess, client, namespace, "create", envVars, labels, updateExisting); err != nil {
+					if err := reconcile(worker, name, image, fprocess, client, namespace, "create", envVars, labels, annotations, updateExisting); err != nil {
 						log.Printf("[%d] Error reconciling %s: %s", worker, name, err)
 					}
 				}
@@ -90,7 +92,7 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func reconcile(worker int, name, image, fprocess string, client *sdk.Client, namespace, action string, envVars, labels []string, updateExisting bool) error {
+func reconcile(worker int, name, image, fprocess string, client *sdk.Client, namespace, action string, envVars, labels []string, annotations []string, updateExisting bool) error {
 	if action == "create" {
 		spec := types.FunctionDeployment{
 			Service:   name,
@@ -118,6 +120,17 @@ func reconcile(worker int, name, image, fprocess string, client *sdk.Client, nam
 		}
 		if len(labelMap) > 0 {
 			spec.Labels = &labelMap
+		}
+
+		// Process annotations
+		annotationMap := make(map[string]string)
+		for _, annotation := range annotations {
+			if key, value, found := strings.Cut(annotation, "="); found {
+				annotationMap[key] = value
+			}
+		}
+		if len(annotationMap) > 0 {
+			spec.Annotations = &annotationMap
 		}
 
 		if len(fprocess) > 0 {
