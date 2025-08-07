@@ -32,6 +32,10 @@ Each function will be named with a numeric suffix.`,
 	flags.StringArray("label", []string{}, "labels to set on the function (format: KEY=VALUE)")
 	flags.StringArray("annotation", []string{}, "annotations to set on the function (format: KEY=VALUE)")
 	flags.Bool("update-existing", false, "update existing functions, when set to false, any existing functions are skipped")
+	flags.String("memory-limit", "", "memory limit to set for functions in Mi")
+	flags.String("cpu-limit", "", "cpu limit to set for functions in millicores")
+	flags.String("memory-request", "", "memory request to set for functions in Mi")
+	flags.String("cpu-request", "", "cpu request to set for functions in millicores")
 
 	cmd.MarkFlagRequired("image")
 
@@ -60,6 +64,10 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	namespace, _ := cmd.Flags().GetString("namespace")
 	workers, _ := cmd.Flags().GetInt("workers")
 	updateExisting, _ := cmd.Flags().GetBool("update-existing")
+	cpuRequest, _ := cmd.Flags().GetString("cpu-request")
+	cpuLimit, _ := cmd.Flags().GetString("cpu-limit")
+	memoryRequest, _ := cmd.Flags().GetString("memory-request")
+	memoryLimit, _ := cmd.Flags().GetString("memory-limit")
 
 	wg := sync.WaitGroup{}
 	wg.Add(workers)
@@ -71,7 +79,21 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		go func(worker int) {
 			for name := range workChan {
 				if len(name) > 0 {
-					if err := reconcile(worker, name, image, fprocess, client, namespace, "create", envVars, labels, annotations, updateExisting); err != nil {
+					if err := reconcile(worker,
+						name,
+						image,
+						fprocess,
+						client,
+						namespace,
+						"create",
+						envVars,
+						labels,
+						annotations,
+						updateExisting,
+						cpuRequest,
+						cpuLimit,
+						memoryRequest,
+						memoryLimit); err != nil {
 						log.Printf("[%d] Error reconciling %s: %s", worker, name, err)
 					}
 				}
@@ -92,7 +114,18 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func reconcile(worker int, name, image, fprocess string, client *sdk.Client, namespace, action string, envVars, labels []string, annotations []string, updateExisting bool) error {
+func reconcile(worker int,
+	name,
+	image,
+	fprocess string,
+	client *sdk.Client,
+	namespace string,
+	action string,
+	envVars, labels []string,
+	annotations []string,
+	updateExisting bool,
+	cpuRequest, cpuLimit string,
+	memoryRequest, memoryLimit string) error {
 	if action == "create" {
 		spec := types.FunctionDeployment{
 			Service:   name,
@@ -135,6 +168,15 @@ func reconcile(worker int, name, image, fprocess string, client *sdk.Client, nam
 
 		if len(fprocess) > 0 {
 			spec.EnvProcess = fprocess
+		}
+
+		spec.Requests = &types.FunctionResources{
+			Memory: memoryRequest,
+			CPU:    cpuRequest,
+		}
+		spec.Limits = &types.FunctionResources{
+			Memory: memoryLimit,
+			CPU:    cpuLimit,
 		}
 
 		start := time.Now()
