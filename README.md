@@ -71,6 +71,22 @@ go run . delete env \
     --start-at 0
 ```
 
+## Invoke functions
+
+Multiple functions can be invoked using the `invoke` command.
+
+```bash
+go run . invoke env \
+    --gateway http://127.0.0.1:8080 \
+    --functions 100 \
+    --start-at 0 \
+    --requests 10 \
+    --deadline 10s \
+    --workers 100
+```
+
+This command will invoke each env function 10 times in parallel with a maximum of 100 concurrent requests set by the `--workers` flag.
+
 ## Viewing logs of the operator
 
 Log tailing without stern:
