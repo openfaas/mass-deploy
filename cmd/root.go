@@ -28,6 +28,7 @@ func init() {
 
 	rootCmd.AddCommand(makeCreateCmd())
 	rootCmd.AddCommand(makeDeleteCmd())
+	rootCmd.AddCommand(makeInvokeCmd())
 }
 
 func getClient(cmd *cobra.Command) (*sdk.Client, error) {
