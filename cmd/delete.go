@@ -2,9 +2,9 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
-	"strings"
 	"sync"
 	"time"
 
@@ -83,7 +83,7 @@ func deleteFunction(worker int, name string, client *sdk.Client, namespace strin
 	if err := client.DeleteFunction(context.Background(), name, namespace); err != nil {
 		log.Printf("[%d] Delete %s, error: %s", worker, name, err)
 
-		if !strings.Contains(err.Error(), "not found") {
+		if !errors.Is(err, sdk.ErrNotFound) {
 			return err
 		}
 	}
