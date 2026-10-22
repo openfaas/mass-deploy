@@ -1,6 +1,6 @@
 module github.com/alexellis/mass-deploy
 
-go 1.24
+go 1.27.0
 
 require (
 	github.com/alexellis/go-execute/v2 v2.2.0
